@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Điệp Năm Giới - Smart Book Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,700&family=Lora:ital,wght@0,400;0,500;0,600;1,500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-deep: #0a0705;
+            --paper: #f4efe6; /* Giấy kem mịn */
+            --text-main: #2b1f16;
+            --gold-base: #d4af37;
+            --gold-light: #ffeba1;
+            --gold-dark: #b8860b;
+        }
+
+        body {
+            background: radial-gradient(circle at center, #24150b 0%, var(--bg-deep) 100%);
+            font-family: 'Lora', serif;
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* Cấm cuộn toàn trang */
+            color: #fdfbf7;
+        }
+
+        .book-container {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* --- TRANG BÌA (3D & ÁNH KIM) --- */
+        .cover {
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at top, #382211 0%, #0a0502 100%);
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 4rem 1.5rem;
+            transition: opacity 0.8s ease-in-out, transform 0.8s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+
+        .cover.hidden-anim {
+            opacity: 0;
+            transform: scale(1.15) translateY(-20px);
+            pointer-events: none;
+            filter: blur(10px);
+        }
+
+        .shiny-gold-text {
+            background: linear-gradient(
+                120deg, var(--gold-dark) 0%, var(--gold-base) 20%, #ffffff 45%, var(--gold-base) 60%, var(--gold-dark) 100%
+            );
+            background-size: 250% auto;
+            color: transparent;
+            -webkit-background-clip: text;
+            background-clip: text;
+            animation: shine 4s linear infinite;
+            font-family: 'Playfair Display', serif;
+            filter: drop-shadow(0 6px 8px rgba(0,0,0,0.9));
+        }
+
+        @keyframes shine { to { background-position: 250% center; } }
+
+        .dharma-wheel {
+            animation: breathe 5s ease-in-out infinite;
+        }
+        @keyframes breathe {
+            0%, 100% { transform: scale(1); filter: drop-shadow(0 0 15px rgba(212,175,55,0.4)); }
+            50% { transform: scale(1.04); filter: drop-shadow(0 0 30px rgba(255,215,0,0.7)); }
+        }
+
+        /* Nút 3D Mở */
+        .btn-3d-gold {
+            background: linear-gradient(145deg, #ffe58f, #d4af37, #997000);
+            border: 2px solid #ffeba1;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.7), inset 0 6px 8px rgba(255, 255, 255, 0.7), inset 0 -6px 8px rgba(100, 60, 0, 0.5);
+            color: #3b2311;
+            font-weight: 900;
+            text-transform: uppercase;
+            border-radius: 50px;
+            text-shadow: 0 1px 0 rgba(255,255,255,0.5);
+            transition: transform 0.1s ease, box-shadow 0.1s ease;
+            position: relative;
+            overflow: hidden;
+            outline: none;
+        }
+        .btn-3d-gold::after {
+            content: ''; position: absolute; top: 0; left: -100%; width: 50%; height: 100%;
+            background: linear-gradient(to right, transparent, rgba(255,255,255,0.5), transparent);
+            transform: skewX(-25deg); animation: btnShine 3.5s infinite;
+        }
+        @keyframes btnShine { 0% { left: -100%; } 20%, 100% { left: 200%; } }
+        .btn-3d-gold:active {
+            transform: translateY(6px) scale(0.95);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.9), inset 0 4px 6px rgba(255, 255, 255, 0.6), inset 0 -4px 6px rgba(100, 60, 0, 0.4);
+        }
+
+        /* --- CẤU TRÚC LẬT TRANG SÁCH --- */
+        .book-viewport {
+            width: 100%;
+            max-width: 650px;
+            height: 100vh;
+            position: relative;
+            overflow: hidden; /* Cắt phần trang bị tràn */
+            background-color: var(--paper);
+            box-shadow: 0 0 50px rgba(0,0,0,0.8);
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+        .book-viewport.visible {
+            opacity: 1; transform: translateY(0);
+        }
+
+        /* Băng chuyền chứa các trang */
+        .pages-track {
+            display: flex;
+            width: 100%;
+            height: 100%;
+            transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1); /* Hiệu ứng lật trượt mượt mà */
+            will-change: transform;
+        }
+
+        .page {
+            flex: 0 0 100%; /* Mỗi trang chiếm 100% chiều rộng */
+            width: 100%;
+            height: 100%;
+            overflow-y: auto; /* Cho phép cuộn nhẹ trong 1 trang nếu dài */
+            padding: 3.5rem 1.5rem 12rem 1.5rem;
+            box-sizing: border-box;
+            background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+        }
+        .page::-webkit-scrollbar { width: 0px; } /* Ẩn thanh cuộn */
+
+        .chapter-title {
+            text-align: center;
+            font-size: 1.85rem;
+            font-weight: 800;
+            margin: 1rem 0 2rem 0;
+            padding: 1rem;
+            transition: all 0.5s ease;
+        }
+
+        /* --- ĐOẠN VĂN --- */
+        .read-paragraph {
+            margin-bottom: 1.2rem;
+            line-height: 1.8;
+            font-size: 1.2rem;
+            padding: 1.2rem;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+            border: 1px solid transparent;
+            color: var(--text-main);
+        }
+
+        /* --- HIỆU ỨNG GIỌT NƯỚC (WATER DROP - iOS) --- */
+        .book-viewport.is-reading .read-paragraph,
+        .book-viewport.is-reading .chapter-title {
+            opacity: 0.25; 
+            filter: blur(1px); 
+            transform: scale(0.98);
+        }
+
+        .book-viewport.is-reading .read-paragraph.active,
+        .book-viewport.is-reading .chapter-title.active {
+            opacity: 1;
+            filter: blur(0);
+            transform: scale(1.02);
+            /* Glassmorphism trong vắt như nước */
+            background: rgba(255, 255, 255, 0.4); 
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            /* Viền bóng nước */
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+            border-right: 1px solid rgba(255, 255, 255, 0.3);
+            /* Bóng đổ cực mềm */
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08), inset 0 0 15px rgba(255, 255, 255, 0.6);
+            color: #1a0f07; 
+            font-weight: 600;
+            z-index: 10;
+        }
+
+        /* --- NÚT ĐIỀU HƯỚNG TRANG (L/R) --- */
+        .nav-btn {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 40px; height: 40px;
+            background: rgba(255,255,255,0.2);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255,255,255,0.4);
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            color: #5c4028;
+            font-size: 1.2rem;
+            z-index: 80;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .nav-btn:hover { background: rgba(255,255,255,0.5); transform: translateY(-50%) scale(1.1); }
+        .nav-btn.left { left: 10px; }
+        .nav-btn.right { right: 10px; }
+        .nav-btn.disabled { opacity: 0; pointer-events: none; }
+
+        /* Số trang */
+        .page-indicator {
+            position: absolute;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: 'Lora', serif;
+            font-size: 0.85rem;
+            color: rgba(92, 64, 40, 0.5);
+            letter-spacing: 2px;
+            z-index: 80;
+        }
+
+        /* --- THANH ĐIỀU KHIỂN AUDIO --- */
+        .glass-player {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%) translateY(150px);
+            width: 88%;
+            max-width: 380px;
+            background: rgba(15, 10, 6, 0.85);
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            border-radius: 999px;
+            padding: 0.6rem 1.2rem;
+            display: flex; align-items: center; justify-content: space-between;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.9), inset 0 1px 1px rgba(255,255,255,0.1);
+            z-index: 100;
+            transition: transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .glass-player.visible { transform: translateX(-50%) translateY(0); }
+
+        .play-btn-3d {
+            width: 60px; height: 60px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center; font-size: 1.5rem;
+            background: linear-gradient(145deg, #ffe58f, #d4af37, #997000);
+            border: 2px solid #ffeba1;
+            box-shadow: 0 8px 15px rgba(0,0,0,0.6), inset 0 6px 8px rgba(255, 255, 255, 0.7), inset 0 -6px 8px rgba(100, 60, 0, 0.5);
+            color: #3b2311;
+            text-shadow: 0 1px 0 rgba(255,255,255,0.5);
+            transition: transform 0.1s ease, box-shadow 0.1s ease;
+            outline: none;
+        }
+        .play-btn-3d:active {
+            transform: scale(0.92) translateY(4px);
+            box-shadow: 0 3px 6px rgba(0,0,0,0.8), inset 0 4px 6px rgba(255, 255, 255, 0.6), inset 0 -4px 6px rgba(100, 60, 0, 0.4);
+        }
+
+        .audio-wave { display: flex; align-items: center; gap: 3px; height: 20px; }
+        .audio-wave span {
+            display: block; width: 3px; background-color: var(--gold-light); border-radius: 3px;
+            animation: wave 1s ease-in-out infinite;
+        }
+        .audio-wave span:nth-child(2) { animation-delay: 0.2s; }
+        .audio-wave span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes wave { 0%, 100% { height: 4px; box-shadow: 0 0 2px var(--gold-base); } 50% { height: 16px; box-shadow: 0 0 8px var(--gold-light); } }
+
+    </style>
+</head>
+<body>
+
+    <div class="book-container">
+        
+        <!-- TRANG BÌA -->
+        <div id="coverPage" class="cover">
+            <div class="text-center mt-12">
+                <h1 class="shiny-gold-text text-5xl sm:text-6xl font-black tracking-[0.15em] leading-tight">ĐIỆP<br>NĂM GIỚI</h1>
+            </div>
+
+            <div class="w-64 h-64 relative my-auto dharma-wheel">
+                <svg viewBox="0 0 100 100" class="w-full h-full" fill="none" stroke="#ffeba1" stroke-width="1.5" style="filter: drop-shadow(0 4px 10px rgba(0,0,0,0.8));">
+                    <circle cx="50" cy="50" r="40" stroke-width="2" stroke="url(#goldGrad)"/>
+                    <circle cx="50" cy="50" r="37" stroke-width="0.5" stroke-dasharray="2 2" stroke="#d4af37"/>
+                    <circle cx="50" cy="50" r="12" stroke-width="2" stroke="url(#goldGrad)"/>
+                    <circle cx="50" cy="50" r="6" fill="url(#goldGrad)"/>
+                    <g stroke-width="1.5" stroke="url(#goldGrad)">
+                        <line x1="50" y1="10" x2="50" y2="38" />
+                        <line x1="50" y1="62" x2="50" y2="90" />
+                        <line x1="10" y1="50" x2="38" y2="50" />
+                        <line x1="62" y1="50" x2="90" y2="50" />
+                        <line x1="21.7" y1="21.7" x2="41.5" y2="41.5" />
+                        <line x1="78.3" y1="78.3" x2="58.5" y2="58.5" />
+                        <line x1="21.7" y1="78.3" x2="41.5" y2="58.5" />
+                        <line x1="78.3" y1="21.7" x2="58.5" y2="41.5" />
+                    </g>
+                    <defs>
+                        <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#ffe58f" />
+                            <stop offset="50%" stop-color="#d4af37" />
+                            <stop offset="100%" stop-color="#997000" />
+                        </linearGradient>
+                    </defs>
+                </svg>
+            </div>
+
+            <button onclick="openBook()" class="btn-3d-gold mb-16 px-12 py-3 tracking-widest text-lg">MỞ</button>
+        </div>
+
+        <!-- MÀN HÌNH ĐỌC SÁCH (LẬT TRANG) -->
+        <div id="bookViewport" class="book-viewport">
+            <!-- Nút chuyển trang thủ công -->
+            <button id="btnPrevPage" class="nav-btn left disabled" onclick="manualTurnPage(-1)"><i class="fas fa-chevron-left"></i></button>
+            <button id="btnNextPage" class="nav-btn right" onclick="manualTurnPage(1)"><i class="fas fa-chevron-right"></i></button>
+            <div id="pageIndicator" class="page-indicator">1 / 10</div>
+
+            <!-- Băng chuyền chứa các trang -->
+            <div id="pagesTrack" class="pages-track">
+                <!-- JS sẽ render các div.page vào đây -->
+            </div>
+        </div>
+
+        <!-- THANH ĐIỀU KHIỂN -->
+        <div id="glassPlayer" class="glass-player">
+            <div class="flex items-center gap-3 w-1/2">
+                <div id="waveAnim" class="audio-wave hidden"><span></span><span></span><span></span></div>
+                <div id="idleIcon" class="text-[#d4af37] opacity-80 text-xl"><i class="fas fa-om"></i></div>
+                <div class="flex flex-col">
+                    <span id="playerStatus" class="text-[#ffeba1] text-[11px] font-black uppercase tracking-widest">Sẵn sàng</span>
+                    <span class="text-white/60 text-[10px] italic mt-0.5">Chạm câu để đọc</span>
+                </div>
+            </div>
+
+            <button id="btnPlay" onclick="togglePlay()" class="play-btn-3d">
+                <i id="playIcon" class="fas fa-play ml-1"></i>
+            </button>
+
+            <button onclick="closeBook()" class="text-white/50 hover:text-[#ffeba1] p-2 text-xl" title="Trở về bìa">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        // --- ÂM THANH (Chuông Chùa & Mõ) ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playZenSound(type) {
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+            
+            if (type === 'temple_bell') {
+                const osc1 = audioCtx.createOscillator();
+                const osc2 = audioCtx.createOscillator(); 
+                const gainNode = audioCtx.createGain();
+
+                osc1.type = 'sine'; osc1.frequency.setValueAtTime(220, audioCtx.currentTime); 
+                osc2.type = 'sine'; osc2.frequency.setValueAtTime(440, audioCtx.currentTime); 
+
+                gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+                gainNode.gain.linearRampToValueAtTime(0.5, audioCtx.currentTime + 0.05);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 4.5);
+
+                osc1.connect(gainNode); osc2.connect(gainNode); gainNode.connect(audioCtx.destination);
+                osc1.start(audioCtx.currentTime); osc2.start(audioCtx.currentTime);
+                osc1.stop(audioCtx.currentTime + 4.5); osc2.stop(audioCtx.currentTime + 4.5);
+
+            } else if (type === 'tap') {
+                const osc = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                osc.type = 'sine'; osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(200, audioCtx.currentTime + 0.1);
+                
+                gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+                
+                osc.connect(gainNode); gainNode.connect(audioCtx.destination);
+                osc.start(audioCtx.currentTime); osc.stop(audioCtx.currentTime + 0.15);
+            }
+        }
+
+        // --- DỮ LIỆU ĐƯỢC CHIA THÀNH CÁC TRANG ---
+        const bookPagesData = [
+            // Trang 1
+            [
+                { type: 'title', text: "Ý Nghĩa Quy Y" },
+                { type: 'para', text: "Quy Y Tam Bảo là quay về nương tựa ba ngôi báu Phật, Pháp và Tăng." },
+                { type: 'para', text: "Tam Bảo luôn có mặt trong khắp mười phương thế giới mà cũng có mặt trong mọi người và mọi loài." },
+                { type: 'para', text: "Ta trở về quy y nơi Phật, nơi Pháp và nơi Tăng cũng có nghĩa là trở về tin tưởng ở khả năng giác ngộ nơi tự tánh của chính mình, ở khả năng khai mở, phát triển hiểu biết và thương yêu nơi bản thân mình, ở khả năng thực tập hành đạo của cá nhân và đoàn thể mình." },
+                { type: 'para', text: "Quý vị đã tiếp nhận Ba Pháp Quy Y và Năm Giới Quý Báu, đó là nền tảng của hạnh phúc gia đình và chất liệu của chí nguyện lợi tha." },
+                { type: 'para', text: "Quý vị phải ôn tụng thường xuyên giới tướng mỗi tháng ít nhất là một lần tại chùa hoặc tại nhà để sự học hỏi và hành trì Ba Pháp Quy Y và Năm Giới Quý Báu ngày càng sâu sắc và lớn rộng." }
+            ],
+            // Trang 2
+            [
+                { type: 'title', text: "Ba Pháp Quy Y" },
+                { type: 'para', text: "Là đệ tử Phật, quý vị nên tinh tiến tu học theo con đường mà đức Phật đã dày công chỉ dạy để tạo an lạc và hạnh phúc cho chính mình và cho mọi người." },
+                { type: 'para', text: "Quy y Phật: Con về nương tựa Phật, người đưa đường chỉ lối cho con trong cuộc đời." },
+                { type: 'para', text: "Quy y Pháp: Con về nương tựa Pháp, con đường của tình thương và sự hiểu biết." },
+                { type: 'para', text: "Quy y Tăng: Con về nương tựa Tăng, đoàn thể của những người nguyện sống cuộc đời tỉnh thức." }
+            ],
+            // Trang 3
+            [
+                { type: 'title', text: "Năm Giới Quý Báu" },
+                { type: 'para', text: "Năm Giới là nền tảng cho một cuộc sống có hạnh phúc và có chí hướng vị tha, có năng lực bảo vệ sự sống và làm đẹp cho cuộc đời." },
+                { type: 'para', text: "Năm Giới là những nguyên tắc hướng dẫn chúng ta về hướng an lạc, giải thoát và giác ngộ." },
+                { type: 'para', text: "Năm Giới là nền tảng của hạnh phúc cá nhân, hạnh phúc của gia đình và của xã hội." },
+                { type: 'para', text: "Học hỏi và thực hành theo Năm Giới, ta sẽ đi đúng con đường chánh pháp, ta sẽ tránh được lỗi lầm, khổ đau, sợ hãi và thất vọng, ta sẽ xây dựng được an lạc hạnh phúc cho ta, cho gia đình ta và đóng góp vào phẩm chất an lạc và hòa bình của xã hội." }
+            ],
+            // Trang 4
+            [
+                { type: 'title', text: "1. Giới thứ nhất - Bảo vệ sự sống" },
+                { type: 'para', text: "Ý thức được những khổ đau do sự sát hại gây ra, con xin nuôi dưỡng tình thương, bảo vệ sự sống của mọi người và mọi loài." },
+                { type: 'para', text: "Con nguyện không giết hại hay khuyến khích mọi sự sát hại dù trong tâm tưởng hay trong cách sống hằng ngày của chúng con." }
+            ],
+            // Trang 5
+            [
+                { type: 'title', text: "2. Giới thứ hai - Hạnh phúc chân thực" },
+                { type: 'para', text: "Ý thức được những khổ đau do lường gạt, trộm cắp, áp bức và bất công xã hội gây ra, con nguyện không gian tham trộm cắp bất cứ tài vật gì của ai." },
+                { type: 'para', text: "Con nguyện chia sẻ thì giờ, năng lực và tài vật của con với những người đang trong hoàn cảnh thiếu thốn." }
+            ],
+            // Trang 6
+            [
+                { type: 'title', text: "3. Giới thứ ba - Tình thương đích thực" },
+                { type: 'para', text: "Ý thức được những khổ đau do tà hạnh gây ra, con xin học theo tinh thần trách nhiệm không làm việc dục nhiễm với những người không phải là vợ hay chồng của con." },
+                { type: 'para', text: "Con ý thức được rằng những hành động bất chánh sẽ gây ra những đau khổ cho người khác và cho chính con." },
+                { type: 'para', text: "Con biết muốn bảo vệ hạnh phúc của mình và của người khác thì phải biết tôn trọng những cam kết của mình và của người khác." },
+                { type: 'para', text: "Con sẽ làm mọi cách có thể để bảo vệ trẻ em, không cho nạn tà dâm tiếp tục gây nên sự đổ vỡ của các gia đình và của đời sống đôi lứa." }
+            ],
+            // Trang 7
+            [
+                { type: 'title', text: "4. Giới thứ tư - Ái ngữ và lắng nghe" },
+                { type: 'para', text: "Ý thức được những khổ đau do lời nói thiếu chánh niệm và do thiếu khả năng lắng nghe gây ra." },
+                { type: 'para', text: "Con xin nguyện học các hạnh Ái Ngữ và Lắng Nghe để có thể hiến tặng niềm vui cho người, làm vơi bớt nỗi khổ đau của người." },
+                { type: 'para', text: "Con nguyện không loan truyền những tin mà con không biết chắc là có thật, không nói những điều có thể tạo nên sự bất hòa trong gia đình và trong đoàn thể." },
+                { type: 'para', text: "Con nguyện thực tập lắng nghe để hiểu người khác và giúp họ vơi nhẹ khổ đau trong lòng." }
+            ],
+            // Trang 8
+            [
+                { type: 'title', text: "5. Giới thứ năm - Nuôi dưỡng và trị liệu" },
+                { type: 'para', text: "Ý thức được những khổ đau do thói quen tiêu thụ không chánh niệm gây nên, con nguyện học hỏi cách chuyển hóa thân tâm, xây dựng sức khỏe cơ thể và tâm hồn bằng cách thực tập chánh niệm trong việc ăn uống và tiêu thụ." },
+                { type: 'para', text: "Con nguyện không uống rượu, không sử dụng các chất ma túy, không ăn uống hoặc tiêu thụ bất cứ một sản phẩm nào có độc tố, trong đó có internet, phim ảnh, truyền thanh, truyền hình, sách báo và bài bạc." }
+            ],
+            // Trang 9
+            [
+                { type: 'title', text: "Bảy Điều Nguyện" },
+                { type: 'para', text: "1. Nguyện thực tập ăn chay." },
+                { type: 'para', text: "2. Nguyện siêng năng học hỏi giáo pháp." },
+                { type: 'para', text: "3. Nguyện thường xuyên tọa Thiền, lễ Phật, tụng Kinh, niệm Phật." },
+                { type: 'para', text: "4. Nguyện cố gắng làm việc thiện." },
+                { type: 'para', text: "5. Nguyện giúp gia đình và mọi người học hiểu Phật Pháp." },
+                { type: 'para', text: "6. Nguyện hiếu thảo cha mẹ." },
+                { type: 'para', text: "7. Nguyện trọn đời sống theo lời Phật dạy." }
+            ],
+            // Trang 10
+            [
+                { type: 'title', text: "Lời dạy về Thiện sự" },
+                { type: 'para', text: "Như từ một đống hoa,\nNhiều tràng hoa được kết.\nCũng vậy, thân sanh tử,\nLàm được nhiều thiện sự.", center: true },
+                { type: 'title', text: "Lời dạy về Tự quán chiếu" },
+                { type: 'para', text: "Không nên nhìn lỗi người,\nNgười làm hay không làm.\nNên nhìn tự chính mình,\nCó làm hay không làm.", center: true }
+            ]
+        ];
+
+        // --- STATE & TTS ---
+        const synth = window.speechSynthesis;
+        let playQueue = []; // Mảng phẳng chứa tất cả các câu để đọc liên tục
+        let currentIndex = 0; // Vị trí câu đang đọc
+        let currentPage = 0; // Trang hiện tại (0 đến 9)
+        const totalPages = bookPagesData.length;
+        
+        let isPlaying = false;
+        let cachedVoice = null;
+        let speechTimeout = null;
+
+        // Elements
+        const coverPage = document.getElementById('coverPage');
+        const bookViewport = document.getElementById('bookViewport');
+        const pagesTrack = document.getElementById('pagesTrack');
+        const glassPlayer = document.getElementById('glassPlayer');
+        const playIcon = document.getElementById('playIcon');
+        const playerStatus = document.getElementById('playerStatus');
+        const waveAnim = document.getElementById('waveAnim');
+        const idleIcon = document.getElementById('idleIcon');
+        const pageIndicator = document.getElementById('pageIndicator');
+        const btnPrevPage = document.getElementById('btnPrevPage');
+        const btnNextPage = document.getElementById('btnNextPage');
+
+        function loadVoices() {
+            const voices = synth.getVoices();
+            if (voices.length > 0) {
+                cachedVoice = voices.find(v => v.lang.includes('vi') && v.name.includes('Google')) || 
+                              voices.find(v => v.lang.includes('vi')) || voices[0];
+            }
+        }
+        loadVoices();
+        if (speechSynthesis.onvoiceschanged !== undefined) speechSynthesis.onvoiceschanged = loadVoices;
+
+        // --- KHỞI TẠO DOM CHO CÁC TRANG ---
+        function initBook() {
+            let globalItemIndex = 0;
+            pagesTrack.innerHTML = ''; // Xóa rỗng
+
+            bookPagesData.forEach((pageData, pIndex) => {
+                const pageDiv = document.createElement('div');
+                pageDiv.className = 'page';
+                pageDiv.id = `page-${pIndex}`;
+                
+                let html = '';
+                pageData.forEach((item) => {
+                    // Lưu vào hàng đợi đọc (chứa thêm thông tin thuộc trang nào)
+                    playQueue.push({ 
+                        id: `item-${globalItemIndex}`, 
+                        text: item.text, 
+                        isTitle: item.type === 'title',
+                        pageIndex: pIndex
+                    });
+
+                    // Tạo HTML
+                    if (item.type === 'title') {
+                        html += `<h2 id="item-${globalItemIndex}" class="chapter-title shiny-gold-text" onclick="jumpTo(${globalItemIndex})">${item.text}</h2>`;
+                    } else if (item.type === 'para') {
+                        let formattedText = item.text.replace(/\n/g, '<br>');
+                        let alignClass = item.center ? 'text-center italic font-medium text-[1.3rem]' : 'text-justify';
+                        html += `<p id="item-${globalItemIndex}" class="read-paragraph ${alignClass}" onclick="jumpTo(${globalItemIndex})">${formattedText}</p>`;
+                    }
+                    globalItemIndex++;
+                });
+
+                // Thêm icon hoa sen mờ ở cuối mỗi trang
+                html += `<div class="text-center mt-10 mb-20 opacity-20"><i class="fas fa-seedling text-[#8a6345] text-3xl"></i></div>`;
+                
+                pageDiv.innerHTML = html;
+                pagesTrack.appendChild(pageDiv);
+            });
+            
+            updatePageUI();
+        }
+
+        // --- LOGIC LẬT TRANG (CHUYỂN ĐỘNG TRƯỢT X) ---
+        function updatePageUI() {
+            // Trượt Track
+            pagesTrack.style.transform = `translateX(-${currentPage * 100}%)`;
+            pageIndicator.innerText = `${currentPage + 1} / ${totalPages}`;
+            
+            // Cập nhật nút bấm thủ công
+            btnPrevPage.classList.toggle('disabled', currentPage === 0);
+            btnNextPage.classList.toggle('disabled', currentPage === totalPages - 1);
+        }
+
+        function manualTurnPage(direction) {
+            // Khi người dùng tự lật trang -> tắt Audio để họ chủ động đọc
+            if(isPlaying) stopCompletely(); 
+            playZenSound('tap');
+            
+            currentPage += direction;
+            if (currentPage < 0) currentPage = 0;
+            if (currentPage >= totalPages) currentPage = totalPages - 1;
+            
+            updatePageUI();
+        }
+
+        function autoGoToPage(targetPage, callback) {
+            if (currentPage !== targetPage) {
+                currentPage = targetPage;
+                updatePageUI();
+                // Đợi hiệu ứng lật trang (600ms) xong mới làm tiếp
+                setTimeout(() => { if(callback) callback(); }, 600);
+            } else {
+                if(callback) callback();
+            }
+        }
+
+        // --- ĐIỀU KHIỂN CHUNG UI ---
+        function openBook() {
+            playZenSound('temple_bell');
+            coverPage.classList.add('hidden-anim');
+            setTimeout(() => {
+                bookViewport.classList.add('visible');
+                glassPlayer.classList.add('visible');
+            }, 600);
+        }
+
+        function closeBook() {
+            stopCompletely();
+            glassPlayer.classList.remove('visible');
+            bookViewport.classList.remove('visible');
+            setTimeout(() => {
+                coverPage.classList.remove('hidden-anim');
+                currentPage = 0; updatePageUI(); // Reset về trang 1
+            }, 600);
+        }
+
+        function stopCompletely() {
+            isPlaying = false;
+            synth.cancel();
+            clearTimeout(speechTimeout);
+            updatePlayerUI();
+            clearAllHighlights();
+            bookViewport.classList.remove('is-reading');
+        }
+
+        // --- LOGIC ĐỌC TTS ---
+        function jumpTo(index) {
+            playZenSound('tap');
+            currentIndex = index;
+            // Nếu đoạn văn nằm ở trang khác, lật tới trang đó trước
+            const targetPage = playQueue[currentIndex].pageIndex;
+            
+            if(isPlaying) {
+                synth.cancel();
+                clearTimeout(speechTimeout);
+                autoGoToPage(targetPage, readCurrent);
+            } else {
+                autoGoToPage(targetPage, togglePlay);
+            }
+        }
+
+        function togglePlay() {
+            playZenSound('tap');
+            if (!synth) return;
+
+            if (isPlaying) {
+                stopCompletely();
+            } else {
+                isPlaying = true;
+                bookViewport.classList.add('is-reading');
+                updatePlayerUI();
+                readCurrent();
+            }
+        }
+
+        function readCurrent() {
+            if (!isPlaying || currentIndex >= playQueue.length) {
+                stopCompletely();
+                currentIndex = 0;
+                return;
+            }
+
+            let currentItem = playQueue[currentIndex];
+            
+            // 1. Kiểm tra lật trang tự động
+            if (currentPage !== currentItem.pageIndex) {
+                autoGoToPage(currentItem.pageIndex, () => {
+                    if(isPlaying) processReading(currentItem);
+                });
+                return; // Dừng hàm hiện tại, chờ lật trang xong callback sẽ gọi processReading
+            } else {
+                processReading(currentItem);
+            }
+        }
+
+        function processReading(currentItem) {
+            clearAllHighlights();
+            
+            // Xử lý UI Focus & Cuộn nhẹ trong trang (nếu trang quá dài)
+            let el = document.getElementById(currentItem.id);
+            if (el) {
+                el.classList.add('active');
+                const pageContainer = document.getElementById(`page-${currentPage}`);
+                const elRect = el.getBoundingClientRect();
+                const containerRect = pageContainer.getBoundingClientRect();
+                
+                // Nếu bị khuất, cuộn trang hiện tại
+                const elOffset = elRect.top - containerRect.top + pageContainer.scrollTop;
+                const targetScroll = elOffset - (containerRect.height / 2) + (elRect.height / 2);
+                pageContainer.scrollTo({ top: targetScroll, behavior: 'smooth' });
+            }
+
+            let delayMs = 0;
+            if (currentItem.isTitle) {
+                playZenSound('temple_bell');
+                playerStatus.innerText = 'Đang thỉnh chuông...';
+                delayMs = 2000; // Đợi chuông 2s
+            } else {
+                playerStatus.innerText = 'Đang thiền đọc...';
+            }
+
+            speechTimeout = setTimeout(() => {
+                if (!isPlaying) return; 
+                playerStatus.innerText = 'Đang thiền đọc...';
+
+                let utterance = new SpeechSynthesisUtterance(currentItem.text);
+                utterance.lang = 'vi-VN';
+                utterance.rate = 0.95;
+                if(cachedVoice) utterance.voice = cachedVoice;
+
+                utterance.onend = () => {
+                    currentIndex++;
+                    readCurrent(); 
+                };
+
+                utterance.onerror = (e) => {
+                    if(e.error !== 'interrupted' && e.error !== 'canceled') stopCompletely();
+                };
+
+                synth.speak(utterance);
+            }, delayMs);
+        }
+
+        function clearAllHighlights() {
+            document.querySelectorAll('.chapter-title, .read-paragraph').forEach(el => {
+                el.classList.remove('active');
+            });
+        }
+
+        function updatePlayerUI() {
+            if (isPlaying) {
+                playIcon.className = 'fas fa-pause';
+                playIcon.classList.remove('ml-1');
+                waveAnim.classList.remove('hidden');
+                idleIcon.classList.add('hidden');
+            } else {
+                playIcon.className = 'fas fa-play ml-1';
+                playerStatus.innerText = 'Tạm dừng';
+                waveAnim.classList.add('hidden');
+                idleIcon.classList.remove('hidden');
+            }
+        }
+
+        window.onbeforeunload = () => stopCompletely();
+        initBook();
+    </script>
+</body>
+</html>
+
+
